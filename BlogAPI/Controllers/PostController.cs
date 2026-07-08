@@ -190,5 +190,44 @@ namespace BlogAPI.Controllers
             }
         }
 
+        [HttpDelete]
+        public async Task<ActionResult> DeletePost(int id)
+        {
+            try
+            {
+                // Előbb lekérdezzük, ha van találat, akkor módosítunk:
+                var post = await _blogContext.Posts.FindAsync(id);
+
+                if (post != null)
+                {
+                    _blogContext.Posts.Remove(post);
+                    await _blogContext.SaveChangesAsync();
+
+                    return Ok(new
+                    {
+                        message = "Sikeres törlés!",
+                        result = post
+                    });
+
+                }
+
+                return StatusCode(404, new
+                {
+                    message = "Nincs ilyen poszt!",
+                    result = post
+                });
+
+            }
+            catch (Exception ex)
+            {
+                var realMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+
+                return StatusCode(400, new
+                {
+                    message = realMessage
+                });
+            }
+        }
+
     }
 }
