@@ -1,6 +1,10 @@
+using BlogAPI.Models;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<BlogContext>();
+
 
 // Add services to the container.
 
@@ -14,8 +18,6 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    // *****************************
-    // Beírás:
     app.MapScalarApiReference();
 }
 
