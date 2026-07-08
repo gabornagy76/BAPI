@@ -188,6 +188,7 @@ namespace BlogAPI.Controllers
                 });
             }
         }
+
         [HttpDelete]
         public async Task<ActionResult> DeleteBlogger(int id)
         {
