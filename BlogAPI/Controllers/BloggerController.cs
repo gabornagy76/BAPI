@@ -227,5 +227,103 @@ namespace BlogAPI.Controllers
                 });
             }
         }
+
+        // A blogger kapcsolódó másik táblában lévő rekordjait is megjelenítjük:
+        // Ez egy HTTP GET végpont, de itt már megadunk egy egyedi útvonalat (route-ot) is. Ez azt jelenti, hogy ezt a metódust például a getBloggerData címen lehet elérni.
+        [HttpGet("getBloggerData")]
+        public async Task<ActionResult> GetAllBloggerData(int id)
+        {
+            try
+            {
+                // Az adatbázis 'Bloggers' táblájában indítunk egy aszinkron keresést.
+                var bloggerData = await _blogContext.Bloggers
+                // 1. Az .Include(x => x.Posts) (Eager Loading) arra kéri az Entity Frameworköt, hogy az adott bloggerhez kapcsolódó összes posztot is gyűjtse ki a 'Posts' táblából.
+                    .Include(x => x.Posts)
+                // 2. A .FirstOrDefaultAsync(x => x.Id == id) megkeresi a legelső (és egyetlen) olyan blogger rekordot, amelynek az egyedi azonosítója (Id) megegyezik a kapott paraméterrel.
+                    .FirstOrDefaultAsync(x => x.Id == id);
+
+                // Megvizsgáljuk, hogy talált-e a rendszer ilyen ID-jú bloggert az adatbázisban.
+                if (bloggerData != null)
+                {
+                    return Ok(new
+                    {
+                        message = "Sikeres lekérdezés!",
+                        result = bloggerData
+                    });
+                }
+
+                return StatusCode(404, new
+                {
+                    message = "Sikertelen lekérdezés!",
+                    result = bloggerData
+                });
+            }
+            catch (Exception ex)
+            {
+                var realMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+
+                return StatusCode(400, new
+                {
+                    message = realMessage
+                });
+            }
+        }
+
+        // Ahhoz, hogy csak a blogger nevét és a posztok tartalmát adjuk vissza (és semmi mást, így elkerülve a felesleges adatcipelést és a ciklushibát is), a legjobb módszer a vetítés (szakszóval Projection), amit a .Select() metódussal tudunk megtenni.
+        // Ezzel pontosan megmondjuk az Entity Frameworknek, hogy milyen szerkezetű adatot válogasson össze az adatbázisból.
+        
+                [HttpGet("bloggerAndContent")]
+        public async Task<ActionResult> BloggerNameAndPostContent(int id)
+        {
+            try
+            {                
+                // Elindítjuk az aszinkron lekérdezést az adatbázis 'Bloggers' tábláján.
+                // A 'await' kulcsszó megvárja, amíg az adatbázis-szerver feldolgozza a kérést, így nem blokkolja a szerver futását.
+                var bloggerData = await _blogContext.Bloggers
+                    // Első lépésben leszűkítjük a találatokat arra az egyetlen bloggerre, amelynek az Id-ja megegyezik a metódus paramétereként kapott 'id' számmal.
+                    .Where(x => x.Id == id)
+                    // A .Select() segítségével megmondjuk az EF Core-nak, hogy NE a teljes Blogger rekordot húzza le az összes oszloppal, hanem egy teljesen új, egyedi szerkezetű (névtelen) objektumot építsen fel nekünk az adatbázisból.
+                    .Select(b => new
+                    {
+                        // Kinyerjük a blogger 'UserName' (felhasználónév) mezőjét, és elmentjük egy 'BloggerName' nevű tulajdonságba.
+                        BloggerName = b.UserName,
+                        // Belépünk a bloggerhez kapcsolódó 'Posts' táblába (itt az EF Core automatikusan elvégzi a háttérben a JOIN-t).
+                        // Egy belső .Select()-tel a posztoknak is CSAK a 'Content' (tartalom) mezőjét kérjük el, a többit (Id, Dátum stb.) eldobjuk.
+                        // A .ToList() biztosítja, hogy a posztok tartalma egy tiszta listaként (tömbként) jelenjen meg a JSON-ben.
+                        Posts = b.Posts.Select(p => new
+                        {
+                            p.Title,
+                            p.Content
+                        }).ToList()
+                    })
+                    // A .FirstOrDefaultAsync() parancs futtatja le ténylegesen az SQL lekérdezést.
+                    // Kivonja a .Select() által legyártott listából a legelső elemet. 
+                    // Mivel az Id egyedi, ez pontosan 1 darab egyedi objektumot fog visszaadni (vagy null-t, ha nincs ilyen ID-jú blogger).
+                    .FirstOrDefaultAsync();
+
+                if (bloggerData != null)
+                {
+                    return Ok(new
+                    {
+                        message = "Sikeres lekérdezés!",
+                        result = bloggerData
+                    });
+                }
+
+                return StatusCode(404, new
+                {
+                    message = "A keresett blogger nem található!"
+                });
+            }
+            catch (Exception ex)
+            {
+                var realMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+
+                return StatusCode(400, new
+                {
+                    message = realMessage
+                });
+            }
+        }
     }
 }
